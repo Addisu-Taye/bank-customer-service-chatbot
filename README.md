@@ -22,24 +22,23 @@ This project loads various document formats (PDF, Word, etc.) from local folders
 - ✅ **Clean Error Handling**  
   Skips problematic files and logs loading issues for review.
 
----
+
 
 ## 📁 Project Structure
 
+```plaintext
 bank-customer-service-chatbot/
+│
+├── bank_docs/                # Source documents (PDF, DOCX, TXT)
+├── vectors/                  # Saved vector database files (e.g., bank_data.pkl)
 ├── utils/
-│ ├── doc_loader.py # Document loading utilities
-│ ├── vector_builder.py # Embedding & vector DB logic
-├── bank_docs/ # Input documents (PDF, DOCX, etc.)
-├── vectors/ # Output FAISS vector DB
-├── requirements.txt # Python dependencies
-└── README.md # This documentation
+│   ├── doc_loader.py         # Document loading utility
+│   ├── vector_builder.py     # Vector DB creation and saving logic
+│   └── chat_engine.py        # Chat interaction logic (optional)
+├── requirements.txt          # Python dependencies
+└── README.md                 # Project documentation
+```
 
-yaml
-Copy
-Edit
-
----
 
 ## ⚙️ Installation
 
@@ -74,7 +73,7 @@ Place your bank-related documents (PDFs, Word files, etc.) in the bank_docs/ fol
 Step 2: Generate Vector Database
 
 ```bash
-python -c "from utils.vector_builder import save_vector_db; save_vector_db('bank_docs', 'vectors/bank_data.pkl')"
+python -c "from utils.vector_builder import save_vector_db; save_vector_db('bank_docs', 'vectors')"
 ```
 This will:
 
