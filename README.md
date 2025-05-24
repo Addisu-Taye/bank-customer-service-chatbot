@@ -67,6 +67,7 @@ pip install "unstructured[pdf]"    # For PDF support
 pip install pdfminer.six           # Required for PDF parsing
 ```
 🚀 Usage
+
 Step 1: Prepare Your Documents
 Place your bank-related documents (PDFs, Word files, etc.) in the bank_docs/ folder.
 
@@ -119,3 +120,10 @@ See the LICENSE file for more details.
 
 🤝 Contact
 For questions, issues, or collaborations, please open an issue or contact Addisu Taye.
+---
+
+## About Me
+![Your GitHub Profile Picture](https://github.com/Addisu-Taye.png)
+Hi there! I'm Addisu Taye Dadi, a passionate and dedicated software developer based in Addis Ababa, Ethiopia. With a keen interest in leveraging technology to solve real-world problems, I specialize in areas like Natural Language Processing (NLP) and building intelligent systems. I enjoy creating robust and efficient solutions, as demonstrated in projects like the Bank Customer Service Chatbot.
+
+---
