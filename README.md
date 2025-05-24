@@ -48,32 +48,34 @@ Edit
 ```bash
 git clone https://github.com/Addisu-Taye/bank-customer-service-chatbot.git
 cd bank-customer-service-chatbot
-2. Create and Activate Virtual Environment
-bash
-Copy
-Edit
+```
+### 2. Create and Activate Virtual Environment
+
+```bash
 python -m venv venv
 # macOS/Linux
 source venv/bin/activate
 # Windows
 venv\Scripts\activate
-3. Install Dependencies
-bash
-Copy
-Edit
+
+```
+### 3. Install Dependencies
+
+```bash
 pip install -r requirements.txt
 pip install langchain-unstructured
 pip install "unstructured[pdf]"    # For PDF support
 pip install pdfminer.six           # Required for PDF parsing
+```
 🚀 Usage
 Step 1: Prepare Your Documents
 Place your bank-related documents (PDFs, Word files, etc.) in the bank_docs/ folder.
 
 Step 2: Generate Vector Database
-bash
-Copy
-Edit
+
+```bash
 python -c "from utils.vector_builder import save_vector_db; save_vector_db('bank_docs', 'vectors/bank_data.pkl')"
+```
 This will:
 
 Load all supported documents in bank_docs/
