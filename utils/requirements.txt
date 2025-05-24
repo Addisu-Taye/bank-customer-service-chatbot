@@ -1,0 +1,12 @@
+streamlit
+sentence-transformers
+faiss-cpu
+pypdf
+python-docx
+requests
+langchain
+langchain-community
+docx2txt
+unstructured[pdf]
+
+
