@@ -1,4 +1,4 @@
-🏦 Bank Customer Service Chatbot
+🏦 ABC Bank Customer Service Chatbot
 Overview
 This project delivers a Bank Customer Service Chatbot designed to revolutionize how financial institutions handle customer inquiries. Leveraging cutting-edge Natural Language Processing (NLP) and vector search techniques, the chatbot provides instant, accurate, and intelligent responses by drawing information directly from your bank's existing documentation.
 
