@@ -4,6 +4,7 @@
 A vector-based chatbot system for bank customer service, built using LangChain and HuggingFace embeddings. This project dynamically loads its knowledge base from a GitHub Release, processes financial documents into vector embeddings, and uses a FAISS vector database for efficient semantic search and chatbot interaction.
 
 ## Features
+
 📄 Multi-format Document Loading: Supports PDF, DOCX, and TXT files using langchain_unstructured loaders.
 🧠 Financial-Domain Vector Store: Uses FinLang/finance-embeddings-investopedia for embedding generation.
 🌐 Self-Contained Deployment: Streamlit app downloads and extracts the vector DB at runtime.
