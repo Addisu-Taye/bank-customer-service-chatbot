@@ -1,12 +1,13 @@
-# app.py
 import os
 import streamlit as st
 import requests
 from dotenv import load_dotenv
 from utils.chat_engine import ChatEngine # Assuming utils/chat_engine.py exists and is correctly implemented
+from langchain_huggingface import HuggingFaceEmbeddings # Import for embedding model (still used by helper functions)
 import zipfile
 import io
 import logging
+import re # Import regex for advanced text matching
 
 # Configure logging for better visibility in Streamlit logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -15,109 +16,46 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 load_dotenv() # Load environment variables from .env file
 
 # Retrieve Hugging Face API token from environment variables.
-# IMPORTANT: For deployment (e.g., Streamlit Community Cloud), configure this token
-# securely in your platform's secrets management (e.g., Streamlit Secrets).
+# IMPORTANT: For production deployment (e.g., Streamlit Community Cloud),
+# configure this token securely in your platform's secrets management (e.g., Streamlit Secrets).
+# For local development, ensure it's set in your .env file.
 HUGGINGFACEHUB_API_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 if not HUGGINGFACEHUB_API_TOKEN:
     st.error("HUGGINGFACEHUB_API_TOKEN environment variable is not set. "
              "Please configure it in your .env file locally, or in your deployment platform's secrets.")
     st.stop() # Stop the app if the token is missing
 
-# Define paths and URLs as constants
-LOCAL_VECTOR_DIR = "vectors" # This is the local directory where FAISS files will be extracted
+# Define paths as constants
+LOCAL_VECTOR_DIR = "vectors" # This is the local directory where FAISS files are expected
+# In a production environment, ensure this 'vectors' folder is included in your deployment
+# package or that the vector database is fetched from a persistent storage location (e.g., S3).
 
-# IMPORTANT: REPLACE THIS URL WITH THE DIRECT DOWNLOAD LINK TO YOUR 'vectors.zip' FILE.
-# This ZIP file should contain 'index.faiss' and 'index.pkl' directly at its root.
-# You typically get this URL by uploading 'vectors.zip' to a GitHub Release,
-# and then right-clicking on the uploaded asset to "Copy link address".
-GITHUB_RELEASES_ZIP_URL = "https://github.com/user-attachments/files/20436458/Vectors.zip"
-# Example: "https://github.com/YourUsername/YourRepoName/releases/download/v1.0.0/vectors.zip"
+# --- Helper Functions for Chatbot Conversation Flow ---
 
-# --- Helper Functions ---
-
-@st.cache_resource
-def download_and_extract_vector_database(local_dir: str, remote_zip_url: str) -> bool:
-    """
-    Downloads a ZIP file from a remote URL and extracts its contents
-    (expected to be FAISS index files) to the specified local directory.
-    Uses Streamlit's cache_resource to ensure this heavy operation runs only once.
-    """
-    # Check if the necessary FAISS files already exist in the target directory
-    # This prevents re-downloading if the app restarts and files are persistent (e.g., in some deployment environments)
-    if os.path.exists(os.path.join(local_dir, 'index.faiss')) and \
-       os.path.exists(os.path.join(local_dir, 'index.pkl')):
-        logging.info("Vector database already exists locally. Skipping download.")
-        st.success("Bank knowledge base loaded successfully!")
-        return True
-
-    logging.info(f"Initiating download and extraction of vector database from: {remote_zip_url}")
-    st.info("Downloading and preparing the bank knowledge base. This may take a moment...")
-
-    try:
-        # Send a GET request to download the ZIP file, with a timeout
-        response = requests.get(remote_zip_url, stream=True, timeout=300)
-        response.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
-
-        # Create an in-memory byte stream from the response content
-        zip_file_bytes = io.BytesIO(response.content)
-
-        # Open the ZIP file from the in-memory stream
-        with zipfile.ZipFile(zip_file_bytes, 'r') as zip_ref:
-            # Ensure the local directory exists to extract files into
-            os.makedirs(local_dir, exist_ok=True)
-            
-            extracted_files_count = 0
-            # Iterate through all members (files/folders) in the ZIP archive
-            for member in zip_ref.namelist():
-                if not member.endswith('/'): # Process only files, skip directories
-                    # Construct the full target path for the extracted file
-                    # This assumes index.faiss and index.pkl are at the root of the ZIP
-                    target_filepath = os.path.join(local_dir, member) 
-                    
-                    # Create any necessary parent directories for the target file
-                    os.makedirs(os.path.dirname(target_filepath), exist_ok=True)
-                    
-                    logging.info(f"Extracting {member} to {target_filepath}")
-                    # Write the content of the ZIP member to the target file
-                    with open(target_filepath, "wb") as outfile:
-                        outfile.write(zip_ref.read(member))
-                    extracted_files_count += 1
-            
-            if extracted_files_count == 0:
-                logging.error("No files were extracted from the ZIP. Is the ZIP empty or structured unexpectedly?")
-                st.error("Error: The downloaded knowledge base ZIP seems empty or malformed.")
-                return False
-
-        st.success("Bank knowledge base downloaded and prepared successfully!")
-        return True
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Failed to download ZIP from {remote_zip_url}: {e}")
-        st.error(f"Network Error: Could not download the bank knowledge base. "
-                 f"Please check your internet connection or try again later. Details: {e}")
-        return False
-    except zipfile.BadZipFile:
-        logging.error("Downloaded file is not a valid ZIP archive.")
-        st.error("Error: Downloaded knowledge base file is corrupted. Please try again.")
-        return False
-    except Exception as e:
-        logging.error(f"An unexpected error occurred during extraction: {e}")
-        st.error(f"An unexpected error occurred while preparing the knowledge base: {e}")
-        return False
-
-@st.cache_resource
-def get_chat_engine_instance(vector_path: str):
+# Removed @st.cache_resource
+def _get_chat_engine_instance_internal(vector_path: str): # Removed 'embedder' argument
     """
     Initializes and returns the ChatEngine.
-    Uses Streamlit's cache_resource to ensure the ChatEngine (and its heavy models)
-    are loaded only once per app deployment instance.
+    This function directly initializes the engine without Streamlit caching.
+    The ChatEngine itself will load its embedding model internally.
     """
     logging.info("Initializing ChatEngine...")
+    
+    # Check if the vector store files exist locally
+    if not os.path.exists(os.path.join(vector_path, 'index.faiss')) or \
+       not os.path.exists(os.path.join(vector_path, 'index.pkl')):
+        st.error(f"Vector database files not found in '{vector_path}'. "
+                 "Please ensure 'index.faiss' and 'index.pkl' are present in this folder. "
+                 "Run 'generate_vectors.py' first to create them.")
+        st.stop() # Stop the app if files are missing
+
     try:
-        engine = ChatEngine(vector_path)
+        # Pass only the vector_path to the ChatEngine constructor
+        engine = ChatEngine(vector_path) 
         logging.info("ChatEngine initialized successfully.")
         return engine
     except Exception as e:
-        logging.error(f"Failed to initialize ChatEngine: {e}", exc_info=True) # Log full traceback
+        logging.error(f"Error initializing ChatEngine: {e}", exc_info=True) # Log full traceback
         st.error(f"Failed to set up the AI assistant. Please try refreshing the page or contact support. Details: {e}")
         st.stop() # Stop the app if initialization fails critically
 
@@ -127,10 +65,139 @@ def clear_chat_history():
     st.session_state.chat_history = []
     # Add a welcome message back after clearing for a fresh start
     st.session_state.chat_history.append({"role": "assistant", "content": "Hello! How can I assist you with your banking needs today?"})
+    # The embedder_instance is no longer stored directly in app.py's session_state
+    # as ChatEngine now handles it internally.
+    if 'chat_engine' in st.session_state:
+        del st.session_state['chat_engine']
+
+def handle_conversational_input(prompt: str) -> str | None:
+    """
+    Handles basic greetings and common words to provide a more natural conversational flow.
+    Returns a predefined response if a match is found, otherwise returns None.
+    """
+    lower_prompt = prompt.lower().strip()
+    logging.info(f"DEBUG: Entering handle_conversational_input for prompt: '{prompt}'")
+
+    # Basic greetings
+    if any(word in lower_prompt for word in ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"]):
+        logging.info("DEBUG: Matched greeting.")
+        return "Hello there! How can I help you with your banking needs today?"
+    
+    # Common small talk words
+    if any(word in lower_prompt for word in ["how are you", "what's up", "how's it going"]):
+        logging.info("DEBUG: Matched small talk.")
+        return "I'm a digital assistant, so I don't have feelings, but I'm ready to assist you! What can I help you with?"
+    
+    if "thank you" in lower_prompt or "thanks" in lower_prompt:
+        logging.info("DEBUG: Matched thank you.")
+        return "You're most welcome! Is there anything else I can assist you with?"
+    
+    if "bye" in lower_prompt or "goodbye" in lower_prompt:
+        logging.info("DEBUG: Matched goodbye.")
+        return "Goodbye! Have a great day."
+
+    logging.info("DEBUG: No conversational match found.")
+    # Return None if no conversational match is found
+    return None
+
+def detect_multiple_questions(prompt: str) -> bool:
+    """
+    Heuristically detects if the prompt contains multiple distinct questions.
+    Checks for multiple question marks or common conjunctions followed by question-like phrasing.
+    """
+    lower_prompt = prompt.lower().strip()
+    logging.info(f"DEBUG: Entering detect_multiple_questions for prompt: '{prompt}'")
+
+    # Rule 1: More than one question mark
+    if lower_prompt.count('?') > 1:
+        logging.info("DEBUG: Detected multiple question marks. Assuming multiple questions.")
+        return True
+    
+    # Rule 2: Conjunctions that often link separate questions
+    # Combined with question words or verbs
+    conjunctions = [" and ", " also ", " in addition to ", " furthermore ", " next ", " then ", " what's more ", " as well as "]
+    question_starters = ["what", "how", "when", "where", "why", "can you", "could you", "is there", "do i", "tell me", "explain"]
+
+    for conj in conjunctions:
+        if conj in lower_prompt:
+            # Check if after the conjunction, there's another question-like phrase
+            # Split by regex to handle cases where conjunctions are followed by punctuation
+            parts = re.split(re.escape(conj), lower_prompt, 1) 
+            if len(parts) > 1:
+                after_conj = parts[1].strip()
+                # Check if the part after the conjunction starts with a question word or looks like a new question
+                if any(after_conj.startswith(qs) for qs in question_starters) or after_conj.count('?') >= 1:
+                    logging.info(f"DEBUG: Detected conjunction '{conj}' with another question. Assuming multiple questions.")
+                    return True
+    
+    # Rule 3: Multiple distinct question phrases even if not ending with '?' but containing question words
+    # Split by common sentence terminators and check each segment
+    sentences = re.split(r'[.!?]\s*', lower_prompt) # Split by ., !, or ? followed by space
+    question_like_sentences = [s for s in sentences if any(qs in s for qs in question_starters)]
+    
+    # Filter out very short segments that might be noise or part of a single question's flow
+    question_like_sentences = [s for s in question_like_sentences if len(s.split()) > 2] # Require at least 3 words
+
+    if len(question_like_sentences) > 1:
+        logging.info(f"DEBUG: Detected multiple question-like sentences ({len(question_like_sentences)}). Assuming multiple questions.")
+        return True
+
+    logging.info("DEBUG: No multiple questions detected.")
+    return False
+
+
+def is_out_of_domain(prompt: str) -> bool:
+    """
+    Determines if a user's question is likely out of the chatbot's banking domain.
+    This uses a simple keyword matching approach.
+    """
+    lower_prompt = prompt.lower()
+    logging.info(f"DEBUG: Entering is_out_of_domain for prompt: '{prompt}'")
+    
+    # Keywords indicating general knowledge or non-banking topics
+    out_of_domain_keywords = [
+        "weather", "news", "recipe", "joke", "story", "poem", "history", 
+        "science", "sports", "entertainment", "movie", "book", "music",
+        "tell me about yourself", "who are you", "what is your name",
+        "calculate", "define", "explain concept of", # if not followed by banking terms
+        "stock market prediction", # specific non-banking financial
+        "coding", "programming", "build an app", "football", "celebrity"
+    ]
+
+    # Banking-specific keywords that would keep it in-domain, even if some OOD words exist
+    in_domain_keywords = [
+        "account", "loan", "card", "transfer", "deposit", "withdraw", "fee", 
+        "interest", "credit", "debit", "mortgage", "business", "foreign exchange",
+        "remittance", "investment", "statement", "online banking", "mobile app",
+        "branch", "atm", "swift", "iban", "eligibility", "apply", "balance",
+        "secure", "fraud", "customer service"
+    ]
+
+    # Check for strong out-of_domain signals
+    for keyword in out_of_domain_keywords:
+        if keyword in lower_prompt:
+            # If an out-of-domain keyword is found, check if it's immediately negated by a banking keyword
+            is_definitely_out = True
+            for in_kw in in_domain_keywords:
+                if in_kw in lower_prompt:
+                    is_definitely_out = False
+                    break # Found an in-domain keyword, so it might not be OOD
+            if is_definitely_out:
+                logging.info(f"DEBUG: Matched out-of-domain keyword: '{keyword}'. Returning True.")
+                return True
+                
+    # A catch-all for very short, non-specific queries that aren't greetings
+    # Ensure it's not a greeting before marking it as OOD based on length
+    if len(lower_prompt.split()) < 3 and not handle_conversational_input(prompt):
+        logging.info("DEBUG: Short non-conversational query, likely out-of-domain. Returning True.")
+        return True # Likely too vague to be banking-related
+
+    logging.info("DEBUG: No strong out-of-domain signal. Returning False.")
+    return False
 
 
 # --- Streamlit Page Setup ---
-st.set_page_config(page_title="GlobalTrust Bank AI Assistant", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="GlobalTrust Bank AI Assistant", layout="wide", initial_sidebar_state="expanded", page_icon="🌐") # Added globe emoji as page_icon
 
 st.title("🏦 GlobalTrust Bank AI Assistant")
 st.markdown("""
@@ -151,43 +218,59 @@ st.sidebar.markdown("This chatbot uses a comprehensive knowledge base of bank se
 
 # --- Main Chat Interface Logic ---
 
-# Step 1: Download and extract the vector database
-# This function is cached, so it runs only once per app instance.
-# It will create the 'vectors' directory and populate it with FAISS files.
-if download_and_extract_vector_database(LOCAL_VECTOR_DIR, GITHUB_RELEASES_ZIP_URL):
-    # Step 2: Initialize the ChatEngine
-    # This function is also cached, ensuring the LLM and retriever are loaded once.
-    chat_engine = get_chat_engine_instance(LOCAL_VECTOR_DIR)
-else:
-    # If download_and_extract_vector_database returns False, it means a critical error
-    # occurred during the knowledge base setup, and the app should stop.
-    st.error("Critical error: Could not prepare the bank knowledge base. Please check logs for details.")
-    st.stop()
+# Use st.session_state to store the chat_engine instance
+# The ChatEngine itself will handle loading the embedding model internally.
 
+if 'chat_engine' not in st.session_state:
+    # Initialize the ChatEngine instance only once per session, passing only the vector_path
+    st.session_state.chat_engine = _get_chat_engine_instance_internal(LOCAL_VECTOR_DIR)
+    st.info("Chat engine initialized.") # User feedback
 
-# Step 3: Initialize chat history with a welcome message if it's a new session
+# Now access the instance from session_state
+chat_engine = st.session_state.chat_engine
+
+# Initialize chat history with a welcome message if it's a new session
 # This ensures a clean start for new users or after clearing history.
 if "chat_history" not in st.session_state or not st.session_state.chat_history:
     clear_chat_history()
 
 
-# Step 4: Display past chat history from session state
+# Display past chat history from session state
 for message in st.session_state.chat_history:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Step 5: Handle user input and generate assistant response
+# Handle user input and generate assistant response
 if prompt := st.chat_input("Ask me anything about our bank services..."):
     # Display user's message in the chat interface
     st.chat_message("user").markdown(prompt)
     # Append user's message to chat history
     st.session_state.chat_history.append({"role": "user", "content": prompt})
 
-    # Display assistant's response with a spinner while processing
-    with st.chat_message("assistant"):
+    response = None
+    logging.info(f"Processing user prompt: '{prompt}'")
+
+    # NEW ORDER: Check for multiple questions first
+    if detect_multiple_questions(prompt):
+        response = "It looks like you've asked multiple questions at once! For the best assistance, please ask one question at a time. I'll be happy to help with each of them."
+        logging.info("DEBUG: Detected multiple questions. Responded with guidance.")
+    # Then, check for conversational greetings/small talk
+    elif conversational_response := handle_conversational_input(prompt):
+        response = conversational_response
+        logging.info("DEBUG: Prompt handled by conversational input.")
+    # Next, check if the question is out of domain
+    elif is_out_of_domain(prompt):
+        response = "I apologize, but my current knowledge base is focused on GlobalTrust Bank's services. I might not be able to answer questions outside this scope. Please ask me about accounts, loans, cards, or other banking-related topics!"
+        logging.info("DEBUG: Prompt identified as out of domain.")
+    # If not conversational and not out of domain, proceed with RAG retrieval
+    else:
+        logging.info("DEBUG: Prompt sent to RAG chain.")
+        # Display assistant's response with a spinner while processing
         with st.spinner("Getting your answer..."):
             # Call the chat method of the initialized ChatEngine instance
-            response = chat_engine.chat(prompt)
+            response = chat_engine.get_response(prompt)
+    
+    with st.chat_message("assistant"):
         st.markdown(response)
     # Append assistant's response to chat history
     st.session_state.chat_history.append({"role": "assistant", "content": response})

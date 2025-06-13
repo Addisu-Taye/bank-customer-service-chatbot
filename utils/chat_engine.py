@@ -1,13 +1,12 @@
-# utils/chat_engine.py
+import os
 import pickle
-from textblob import TextBlob
-from transformers import pipeline
+from textblob import TextBlob # For spelling correction
+from transformers import pipeline # For local LLM inference
 from langchain.chains import RetrievalQA
 from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFacePipeline
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFacePipeline # For wrapping local pipeline as LLM
+from langchain_huggingface import HuggingFaceEmbeddings # For embeddings
 import logging
-import os
 import streamlit as st # Ensure streamlit is imported here for @st.cache_resource
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -53,23 +52,27 @@ def load_faiss_vector_db(vector_directory_path: str, _embedding_model):
 @st.cache_resource
 def load_llm_pipeline():
     """
-    Loads the HuggingFace text-to-text generation pipeline (LLM).
+    Loads the HuggingFace text-to-text generation pipeline (LLM) locally.
     This function is cached by Streamlit to load the model only once.
     """
-    logging.info("Loading HuggingFace pipeline 'google/flan-t5-large'...")
+    logging.info("Loading HuggingFace pipeline 'google/flan-t5-base' for local inference...")
     try:
+        # Using device=-1 for CPU. Set to 0 for GPU (if available and configured)
         pipe = pipeline(
             "text2text-generation",
-            model="google/flan-t5-large",
-            max_length=512,
-            temperature=0.3,
-            device=-1 # Set to -1 for CPU, 0 for GPU (if available and configured)
+            model="google/flan-t5-base", # CHANGED to 'google/flan-t5-base'
+            max_length=512, # Max length of the generated response
+            temperature=0.3, # Controls creativity/randomness. Lower (0.1-0.3) for factual.
+            device=-1 # Use CPU
         )
-        logging.info("HuggingFace pipeline 'google/flan-t5-large' initialized.")
+        logging.info("HuggingFace pipeline 'google/flan-t5-base' initialized for local inference.")
+        # Wrap the pipeline in HuggingFacePipeline for LangChain compatibility
         return HuggingFacePipeline(pipeline=pipe)
     except Exception as e:
-        logging.error(f"Failed to load HuggingFace pipeline model: {e}")
-        raise RuntimeError(f"Could not load language model: {e}")
+        logging.error(f"Failed to load HuggingFace pipeline model locally: {e}", exc_info=True)
+        st.error(f"Failed to load the local language model. This might be due to a network issue when downloading the model, or insufficient RAM. Details: {e}")
+        st.stop() # Stop the app if initialization fails critically
+
 
 class ChatEngine:
     """
@@ -82,6 +85,7 @@ class ChatEngine:
         self.embedding = load_embedding_model()
         
         # Load FAISS vector database (cached), passing the embedding model
+        # Using the underscore prefix for the cached argument to prevent hashing issues
         self.vectordb = load_faiss_vector_db(vector_directory_path, self.embedding)
         
         # Initialize retriever from the vector database
@@ -97,7 +101,7 @@ class ChatEngine:
             chain_type="stuff", # 'stuff' combines all retrieved documents into a single prompt
             retriever=self.retriever,
             return_source_documents=False, # Set to True if you want to see which documents were used
-            verbose=True # Keep verbose for debugging the chain itself
+            verbose=False # Keep verbose for debugging the chain itself
         )
         logging.info("RetrievalQA chain initialized.")
 
@@ -115,7 +119,7 @@ class ChatEngine:
             logging.warning(f"Failed to perform spelling correction for '{query}': {e}. Returning original query.")
             return query
 
-    def chat(self, query: str) -> str:
+    def get_response(self, query: str) -> str: # Renamed from 'chat' to 'get_response' for consistency with app.py
         """
         Answers user queries by first checking for common greetings/thanks,
         then spell-checking, and finally invoking the QA chain.
@@ -124,34 +128,24 @@ class ChatEngine:
         if not query or not query.strip():
             return "Please provide a valid question."
 
-        # --- Enhanced conversational handling for greetings and thanks ---
-        lower_query = query.lower().strip()
-
-        # Handle greetings
-        greeting_keywords = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", "how are you"]
-        if any(keyword in lower_query for keyword in greeting_keywords):
-            return "Hello! How can I assist you with your banking needs today?"
-
-        # Handle thank you messages
-        thanks_keywords = ["thank you", "thanks", "appreciate it", "cheers"]
-        if any(keyword in lower_query for keyword in thanks_keywords):
-            return "You're most welcome! Is there anything else I can help you with regarding your banking needs?"
-        # --- End of conversational handling ---
-
-        # Proceed with RAG if it's not a greeting or thank you
-        corrected_query = self.correct_spelling(query)
-        logging.info(f"Processing query: '{query}' (Corrected: '{corrected_query}')")
-
         try:
-            # Invoke the RetrievalQA chain with the corrected query
+            # Apply spelling correction here
+            corrected_query = self.correct_spelling(query) 
+            
             response = self.qa_chain.invoke({"query": corrected_query})
             
             # Extract the 'result' from the response dictionary
             if isinstance(response, dict) and 'result' in response:
-                return response['result']
+                response_text = response['result']
+                # Remove common LLM artifacts
+                response_text = response_text.replace("Based on the provided context, ", "").strip()
+                response_text = response_text.replace("According to the context, ", "").strip()
+                logging.info(f"Generated response for query '{corrected_query}': {response_text[:100]}...")
+                return response_text
             else:
                 logging.warning(f"Unexpected response format from QA chain: {response}")
                 return "I apologize, but I could not retrieve a clear answer. Could you please rephrase your question?"
         except Exception as e:
-            logging.error(f"Error during QA chain invocation for query '{corrected_query}': {e}", exc_info=True)
-            return "I am sorry, but an error occurred while processing your request. Please try again later."
+            logging.error(f"Error during QA chain invocation for query '{query}': {e}", exc_info=True)
+            return "I am sorry, but an error occurred while processing your request. Please try again later. This might be due to insufficient memory for the model."
+
