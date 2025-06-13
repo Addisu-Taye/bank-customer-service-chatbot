@@ -71,7 +71,8 @@ python -c "from utils.vector_builder import save_vector_db; save_vector_db('bank
 ```
 
 textblob, python-dotenv, requests
-## About Me
-![Your GitHub Profile Picture](https://github.com/Addisu-Taye.png)
-Hi there! I'm Addisu Taye Dadi, a passionate and dedicated software developer based in Addis Ababa, Ethiopia. With a keen interest in leveraging technology to solve real-world problems, I specialize in areas like Natural Language Processing (NLP) and building intelligent systems. I enjoy creating robust and efficient solutions, as demonstrated in projects like the Bank Customer Service Chatbot.
+## Reference
+https://app.readytensor.ai/publications/create/ywfeDHNiFx7n/documentation
+Contact: addtaye@gmail.com, kidideme@gmail.com
+
 
