@@ -6,14 +6,20 @@ A vector-based chatbot system for bank customer service, built using LangChain a
 ## Features
 
 📄 Multi-format Document Loading: Supports PDF, DOCX, and TXT files using langchain_unstructured loaders.
+
 🧠 Financial-Domain Vector Store: Uses FinLang/finance-embeddings-investopedia for embedding generation.
-🌐 Self-Contained Deployment: Streamlit app downloads and extracts the vector DB at runtime.
+
+🌐 Self-Contained Deployment: Streamlit app downloads and extracts the vector DB at runtime
+
 🗣️ Enhanced Conversational AI: Recognizes greetings and thanks with polite responses before answering queries.
+
 ⚙️ Extensible Utilities: Modular code structure for maintainability.
+
 ✅ Clean Error Handling: Skips unsupported files gracefully.
+
 📁 Project Structure
 
-Upload vectors.zip under Assets
+
 ## Project Structure
 ```
 bank-customer-service-chatbot/
