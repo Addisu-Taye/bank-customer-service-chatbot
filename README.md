@@ -14,21 +14,6 @@ A vector-based chatbot system for bank customer service, built using LangChain a
 
 Upload vectors.zip under Assets
 ## Project Structure
-
-Publish the release and copy the direct download URL
-
-Paste the URL into app.py:
-
-GITHUB_RELEASES_ZIP_URL = “https://github.com/Addisu-Taye/bank-customer-service-chatbot/releases/download/.../vectors.zip”
-Step 3: Set Environment Variables
-Create a .env file with:
-
-env
-
-HUGGINGFACEHUB_API_TOKEN=your_token_here
-Or configure this variable in your deployment environment (e.g. Streamlit Cloud).
-
-Step 4: Run the Streamlit App
 ```
 bank-customer-service-chatbot/
 ├── bank_docs/                # Source documents (PDF, DOCX, TXT)
@@ -44,14 +29,6 @@ bank-customer-service-chatbot/
 └── README.md                 # This file
 ```
 
-streamlit run app.py
-🛠 Notes & Troubleshooting
-Dynamic Download: App downloads vectors.zip and extracts if vectors/ is missing.
-
-Embedding Model: Uses FinLang/finance-embeddings-investopedia from HuggingFace.
-## Installation
-
-LLM Model: Uses google/flan-t5-large via transformers pipeline.
 ### 1. Clone the Repository
 
 PDF Issues: Ensure pdfminer.six, pypdf, and unstructured are installed.
