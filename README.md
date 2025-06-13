@@ -1,8 +1,6 @@
 
 # Bank Customer Service Chatbot
 
-Step 2: Upload Vector DB to GitHub Release
-Zip the vector DB:
 A vector-based chatbot system for bank customer service, built using LangChain and HuggingFace embeddings. This project dynamically loads its knowledge base from a GitHub Release, processes financial documents into vector embeddings, and uses a FAISS vector database for efficient semantic search and chatbot interaction.
 
 ## Features
