@@ -102,17 +102,3 @@ textblob, python-dotenv, requests
 ![Your GitHub Profile Picture](https://github.com/Addisu-Taye.png)
 Hi there! I'm Addisu Taye Dadi, a passionate and dedicated software developer based in Addis Ababa, Ethiopia. With a keen interest in leveraging technology to solve real-world problems, I specialize in areas like Natural Language Processing (NLP) and building intelligent systems. I enjoy creating robust and efficient solutions, as demonstrated in projects like the Bank Customer Service Chatbot.
 
-👤 About Me
-Addisu Taye Dadi
-Software Engineer | NLP Enthusiast | Addis Ababa, Ethiopia 🇪🇹
-I build intelligent systems to solve real-world problems — like this chatbot.
----
-
-📄 License
-MIT License © 2025 Addisu Taye
-MIT License © 2025 Addisu Taye.
-See the LICENSE file for more details.
-
-See the LICENSE file for details.
-🤝 Contact
-For questions, issues, or collaborations, please open an issue or contact Addisu Taye.
