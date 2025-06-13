@@ -73,6 +73,8 @@ python -c "from utils.vector_builder import save_vector_db; save_vector_db('bank
 textblob, python-dotenv, requests
 ## Reference
 https://app.readytensor.ai/publications/create/ywfeDHNiFx7n/documentation
-Contact: addtaye@gmail.com, kidideme@gmail.com
+
+## Contact: 
+addtaye@gmail.com, kidideme@gmail.com
 
 
